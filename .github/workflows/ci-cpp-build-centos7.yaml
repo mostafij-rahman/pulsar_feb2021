@@ -17,37 +17,29 @@
 # under the License.
 #
 
-name: CI - Go Functions Tests
+name: CI - CPP build on CentOS 7
 on:
   pull_request:
     branches:
       - master
     paths:
       - '.github/workflows/**'
-      - 'pulsar-function-go/**'
+      - 'pulsar-client-cpp/**'
   push:
     branches:
       - branch-*
     paths:
       - '.github/workflows/**'
-      - 'pulsar-function-go/**'
-
-env:
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
-
+      - 'pulsar-client-cpp/**'
 jobs:
 
-  go-functions-tests:
-    name: Run Go Tests
-    strategy:
-      matrix:
-        go-version: [1.11.x, 1.12.x, 1.13.x, 1.14.x]
-        platform: [ubuntu-latest]
-    runs-on: ${{ matrix.platform }}
+  cpp-build-centos7:
+    name:
+    runs-on: ubuntu-latest
     timeout-minutes: 120
 
     steps:
-      - name: Check out code into the Go module directory
+      - name: checkout
         uses: actions/checkout@v2
 
       - name: Tune Runner VM
@@ -63,15 +55,8 @@ jobs:
         id: check_changes
         run: echo "::set-output name=docs_only::${{ fromJSON(steps.changes.outputs.all_count) == fromJSON(steps.changes.outputs.docs_count) && fromJSON(steps.changes.outputs.docs_count) > 0 }}"
 
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        if: ${{ steps.check_changes.outputs.docs_only != 'true' }}
-        with:
-          go-version: ${{ matrix.go-version }}
-        id: go
-
-      - name: Run tests
+      - name: build cpp client on centos 7
         if: ${{ steps.check_changes.outputs.docs_only != 'true' }}
         run: |
-          cd pulsar-function-go
-          go test -v $(go list ./... | grep -v examples)
+          echo "Build C++ client library on CentOS 7"
+          pulsar-client-cpp/docker-build-centos7.sh

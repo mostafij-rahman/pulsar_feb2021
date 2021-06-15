@@ -17,41 +17,45 @@
 # under the License.
 #
 
-name: CI - Go Functions Tests
+name: CI - CPP build on Windows
 on:
   pull_request:
     branches:
       - master
     paths:
       - '.github/workflows/**'
-      - 'pulsar-function-go/**'
+      - 'pulsar-client-cpp/**'
   push:
     branches:
       - branch-*
     paths:
       - '.github/workflows/**'
-      - 'pulsar-function-go/**'
+      - 'pulsar-client-cpp/**'
 
 env:
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  VCPKG_FEATURE_FLAGS: manifests
 
 jobs:
-
-  go-functions-tests:
-    name: Run Go Tests
-    strategy:
-      matrix:
-        go-version: [1.11.x, 1.12.x, 1.13.x, 1.14.x]
-        platform: [ubuntu-latest]
-    runs-on: ${{ matrix.platform }}
+  cpp-build-windows:
     timeout-minutes: 120
 
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: 'Windows x64'
+            os: windows-latest
+            triplet: x64-windows
+            vcpkg_dir: 'C:\vcpkg'
+            suffix: 'windows-win64'
+            generator: 'Visual Studio 16 2019'
+            arch: '-A x64'
 
-      - name: Tune Runner VM
-        uses: ./.github/actions/tune-runner-vm
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
 
       - name: Detect changed files
         id:   changes
@@ -63,15 +67,32 @@ jobs:
         id: check_changes
         run: echo "::set-output name=docs_only::${{ fromJSON(steps.changes.outputs.all_count) == fromJSON(steps.changes.outputs.docs_count) && fromJSON(steps.changes.outputs.docs_count) > 0 }}"
 
-      - name: Set up Go
-        uses: actions/setup-go@v2
+      - name: Install vcpkg packages
         if: ${{ steps.check_changes.outputs.docs_only != 'true' }}
-        with:
-          go-version: ${{ matrix.go-version }}
-        id: go
-
-      - name: Run tests
-        if: ${{ steps.check_changes.outputs.docs_only != 'true' }}
+        shell: bash
         run: |
-          cd pulsar-function-go
-          go test -v $(go list ./... | grep -v examples)
+          cd pulsar-client-cpp && vcpkg install --triplet ${{ matrix.triplet }}
+
+      - name: Configure
+        if: ${{ steps.check_changes.outputs.docs_only != 'true' }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            cd pulsar-client-cpp && \
+            cmake \
+              -B ./build \
+              -G "${{ matrix.generator }}" ${{ matrix.arch }} \
+              -DBUILD_PYTHON_WRAPPER=OFF -DBUILD_TESTS=OFF \
+              -DVCPKG_TRIPLET=${{ matrix.triplet }} \
+              -DCMAKE_BUILD_TYPE=Release \
+              -S .
+          fi
+
+      - name: Compile
+        if: ${{ steps.check_changes.outputs.docs_only != 'true' }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            cd pulsar-client-cpp && \
+            cmake --build ./build
+          fi
