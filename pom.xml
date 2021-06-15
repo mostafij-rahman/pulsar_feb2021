@@ -78,7 +78,7 @@ flexible messaging model and an intuitive client API.</description>
 
   <properties>
     <!--config keys to congiure test selection -->
-    <include>*</include>
+    <include>**/Test*.java,**/*Test.java,**/*Tests.java,**/*TestCase.java</include>
     <exclude/>
     <groups/>
     <excludedGroups/>
